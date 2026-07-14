@@ -1,0 +1,20 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<title>{% if page.title %}{{ page.title | escape }} | {% endif %}{{ site.title | escape }}</title>
+<script>
+  (function () {
+    try {
+      var theme = localStorage.getItem("ohfog-theme");
+      document.documentElement.dataset.theme =
+        theme === "light" || theme === "dark" ? theme : "auto";
+    } catch (error) {
+      document.documentElement.dataset.theme = "auto";
+    }
+  })();
+</script>
+{% seo title=false %}
+{% feed_meta %}
+<link rel="icon" href="{{ '/favicon.ico' | relative_url }}" sizes="any" type="image/x-icon">
+<link rel="stylesheet" href="{{ '/assets/css/main.css' | relative_url }}">

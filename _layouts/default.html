@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="{{ site.lang | default: 'en-US' }}" data-theme="auto">
+  <head>
+    {% include head.html %}
+  </head>
+  <body>
+    <a class="skip-link" href="#main">skip to content</a>
+    <div class="site-shell">
+      {% include header.html %}
+      <main id="main" class="site-main">
+        {{ content }}
+      </main>
+      {% include footer.html %}
+    </div>
+    <script src="{{ '/assets/js/theme.js' | relative_url }}" defer></script>
+  </body>
+</html>

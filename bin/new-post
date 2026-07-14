@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+title="${*:-}"
+
+if [[ -z "$title" ]]; then
+  printf 'usage: %s "Post Title"\n' "$0" >&2
+  exit 2
+fi
+
+slug="$(
+  printf '%s' "$title" |
+    tr '[:upper:]' '[:lower:]' |
+    sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
+)"
+
+if [[ -z "$slug" ]]; then
+  printf 'error: title did not produce a usable slug\n' >&2
+  exit 2
+fi
+
+mkdir -p _posts
+
+post_date="$(date +%F)"
+post_datetime="$(date '+%Y-%m-%d %H:%M:%S %z')"
+post_path="_posts/${post_date}-${slug}.md"
+
+if [[ -e "$post_path" ]]; then
+  printf 'error: %s already exists\n' "$post_path" >&2
+  exit 1
+fi
+
+cat > "$post_path" <<POST
+---
+title: "${title}"
+date: ${post_datetime}
+tags: []
+excerpt: ""
+---
+
+POST
+
+printf '%s\n' "$post_path"

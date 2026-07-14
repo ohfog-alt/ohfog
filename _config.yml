@@ -1,0 +1,36 @@
+title: "oh fog!"
+description: "Ideas about hacking and offensive security."
+url: "https://ohfog.com"
+baseurl: ""
+lang: "en-US"
+timezone: "America/New_York"
+
+permalink: /:year/:month/:day/:title/
+
+markdown: kramdown
+highlighter: rouge
+
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+  - jekyll-seo-tag
+
+defaults:
+  - scope:
+      path: ""
+      type: posts
+    values:
+      layout: post
+  - scope:
+      path: ""
+      type: pages
+    values:
+      layout: page
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+  - bin/
+  - .playwright-mcp/
+  - vendor/
