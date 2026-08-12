@@ -5,7 +5,6 @@ tags: []
 excerpt: ""
 toc: false
 ---
-
 This past weekend, I attended DEF CON 34, the hacking conference. While I was there, I participated in the HalCTF event, where you build an AI agent and the agent plays the Capture The Flag (CTF) game.
 
 This whole journey started last Thursday around 4:20 a.m., when I got to the airport way too early for a flight that was supposed to take off at 6:20 a.m. While I was waiting to board, I went online to look up information about DEF CON: which talks would be interesting, and which villages would have events or talks worth attending. I saw that the [ AI Village](https://aivillage.org/events/defcon-34/) would have this [HalCTF](https://aivillage.org/blog/halctf/), where participants were asked to make an AI agent and the agent would be the actual player, solving the challenges.
@@ -16,15 +15,108 @@ Unfortunately, I made some design decisions based on incomplete information, or 
 
 My first design decision was to build a multi-agent system consisting of an orchestrator agent, which I named the `captain`, and sub-agents that would be specialists in different classes of CTF problems, which I named the `solvers`. The rationale was that this split would help me make better use of a limited context window by loading only the stuff needed for a specific job at a time: the captain would be my expert in CTF strategy and game mechanics, while the solvers would be experts in domains like web, crypto, reversing, and so on.
 
+```text
++--------------------------------------------------------------------+
+| TEQUILA: CTF agent                                                 |
+|                                                                    |
+|                         +------------------+                       |
+|                         |     [captain]    |                       |
+|                         | strategy, routing|                       |
+|                         | deadlines, state |                       |
+|                         +---------+--------+                       |
+|                                   |                                |
+|    +----------------+-------------+-----------+-------------+      |
+|    |                |                         |             |      |
+|    v                v                         v             v      |
+| +-------------+ +-------------+        +-------------+ +---------+ |
+| | web [solver]| | crypto      |        | reversing / | | other   | |
+| |             | | [solver]    |        | pwn [solver]| | solvers | |
+| +-------------+ +-------------+        +-------------+ +---------+ |
+|                                                                    |
++--------------------------------------------------------------------+
+                             |
+                             v
+                           Target
+```
+
 To develop my agent's expertise, I thought it would be a good idea to sample and study CTF write-ups found on the internet, and try to distill the general workflows that successful challenge solves tend to follow in the different categories, as well as general knowledge of technologies, vulnerabilities, attacks, and tools based on the types of puzzles and problems often seen in Capture the Flag. I started by creating a library of 400 CTF write-ups, which later grew to 1,000 write-ups. This was my reference library for how to successfully solve CTF challenges.
 
 A funny detail: I used an AI agent to help me process the write-ups and some of the web pages had hidden prompt injections. Luckily, my agent noticed the prompt injections, ignored the instructions, and simply highlighted them for me as a warning. If you are thinking about sampling write-ups from the internet, be careful in how you process the contents so that your agent does not fall for these prompt injections and uploads your `.env` to some hacker on the Internet.
 
 I also used [progressive disclosure](https://survibecoding.com/ai/start-with-the-agent-workspace/) as a context-engineering technique. Rather than load every piece of knowledge into every prompt, I created small knowledge cards that could be loaded when they were relevant to the kind of challenge the agent was working on.
 
+```text
+TEQUILA runtime instructions
+├── coordinator.py:PLANNER_PROMPT
+│   └── captain instructions:
+│       strategy, routing, checkpoints, stages, deadline, submission
+│
+├── coordinator.py:WORKER_PROMPT
+│   └── shared solver contract:
+│       scope, evidence rules, tool protocol, submit, handoff
+│
+├── profiles.py:specialist_profile(role)
+│   └── prompts/specialists/
+│       ├── web.md: web triage and exploit workflow
+│       ├── crypto.md: crypto analysis and solver workflow
+│       ├── reversing.md: binary and verifier workflow
+│       ├── pwn.md: binary-exploitation workflow
+│       ├── ai.md: AI challenge workflow
+│       ├── network.md: network and protocol workflow
+│       └── ...: other specialist profiles
+│
+├── profiles.py:specialist_knowledge(role, challenge_text)
+│   └── prompts/knowledge/ai/
+│       ├── prompt_indirect_boundary.md
+│       ├── agent_tool_boundary.md
+│       ├── rag_retrieval.md
+│       ├── memory_multiagent_boundary.md
+│       ├── model_classifier_evasion.md
+│       └── infrastructure.md
+│       └── loads up to two cards for AI challenges
+│
+└── profiles.py:challenge_knowledge(title)
+    └── prompts/knowledge/challenges/
+        ├── kanto_cerulean_cave.md
+        ├── pantheon_hydra_signature.md
+        ├── odyssey_cattle_helios.md
+        └── ...: other challenges knowledge
+```
+
 The next important components of my agent design were its memory system and tools. For memory, I debated between greppable files and a lightweight SQLite database. I chose SQLite because it gave the agent durable working memory without turning every note into unstructured text.
 
 Confirmed observations went into facts, while possible solution paths stayed as hypotheses until tested. I also separated model claims from confirmed facts: a solver could suggest an explanation, but the captain would only rely on it once it was tied to an observation. The database could retain more evidence than would fit in a model's working context, then reconstruct a smaller relevant view when needed.
+
+```text
+Tequila SQLite memory
+
+runs
+└── one assigned challenge / one agent run
+    │
+    ├── observations
+    │   └── immutable tool output and saved evidence
+    │         │
+    │         v
+    │      claims
+    │      └── model interpretation tied to an observation
+    │            │
+    │            v
+    │         facts
+    │         └── captain-approved claim:
+    │             safe to use for later planning
+    │
+    ├── hypotheses
+    │   └── possible solution paths
+    │       proposed → tested → confirmed / disproved
+    │
+    ├── agent_sessions
+    │   └── each solver lease:
+    │       role, objective, action budget, status
+    │
+    └── stage_plans
+        └── multi-stage solve state:
+            current stage, completion criterion, next dependency
+```
 
 The first tool surface was deliberately tiny: shell access. That was enough to prove the basic loop, but it was not the final design.
 
@@ -60,7 +152,13 @@ Later, organizers shortened the maximum runtime from one hour to 15 minutes. At 
 
 I also reserved the final minute of each run for checkpoint recovery, submission, and graceful finalization. There was no point beginning new exploration when there was too little time left to finish it.
 
-To address the tool issues, I ended up with a very simple set of tools: `shell` access, `read_file`, and `write_file`. Those seemed to be the most effective and simple, allowing my agent to get work done without getting confused or lost in deciding which tool to use for a given task. That seems to be a common problem with agents when they are exposed to too many tools. The agent could often reason about what a script needed to do, then fail at the mechanical step of expressing it safely through shell quoting, heredocs, and JSON escaping. Restricting the shell made that worse, not better. I restored full Bash inside the isolated worker container and added `write_file` and `read_file`, so the agent could create a small script, append bounded chunks, inspect the exact result, and then run it.
+To address the tool issues, I ended up with a very simple set of tools:
+
+- `shell`: run normal Linux commands and solver programs. The agent needed a real shell, not a narrow command allowlist that rejected useful syntax.
+- `write_file`: create and extend scripts without forcing multiline code through shell quoting, heredocs, and JSON escaping.
+- `read_file`: inspect the exact script or saved evidence after writing it, so the agent could verify, compile, and debug what it actually produced.
+
+Keeping the tool surface this small helped the agent avoid getting confused about which tool to use for a task. The agent could often reason about what a script needed to do, then fail at the mechanical step of expressing it safely, so the tools evolved to be more ergonomic or intuitive for the agent.
 
 I also found that my agent had a few capability gaps in the crypto category. For some crypto challenges, it was necessary to gather a bunch of information from the target in order to do analysis, solve the math, and obtain a key or an answer. When the agent spent most of its time discovering the challenge and creating a tool, it would not have enough time left to run it enough times to gather the necessary information. For cases like that, I started including general-purpose helpers in the image: small data collectors, local constraint-solving tools, and compact HTTP clients. The goal was not to ship a solver for a specific challenge. It was to stop wasting scarce runtime rebuilding ordinary infrastructure before the agent could begin the actual analysis.
 
@@ -72,4 +170,4 @@ By the later releases, ultimately v0.2.27, the agent was no longer struggling wi
 
 The main lesson was that the agent improved less by acquiring new domain specific knowledge than by becoming operationally reliable. Better evidence handling, durable handoffs, script construction, submission behavior, and graceful shutdowns turned more of its reasoning into actual solved challenges.
 
-Thanks and shout-outs to the organizers, especially Cyduck and Zach, and to the other players who hung out at the end and shared ideas and lessons learned: AbliteratedEdgeModel, devins-revenge, feetpics.ai, beymax and dragos.
+Thanks and shout-outs to the organizers, especially Cyduck and Zach, and to the other players who hung out at the end and shared ideas and lessons learned: AbliteratedEdgeModel, devins-revenge, feetpics.ai, beymax and aisafe.
