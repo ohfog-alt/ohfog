@@ -30,11 +30,74 @@ codex --remote ws://127.0.0.1:4500
 ```
  That works on `localhost`, or over a LAN when the listener is exposed on a reachable interface. What it does not provide by itself is the Internet reachability available through the desktop and mobile apps and that did not make sense to me. **Why would OpenAI build one remote-control protocol for local networks and a completely different one for the Internet?** A more plausible explanation was that both experiences used the same Codex app-server protocol underneath, with additional authentication and relay machinery for Internet reachability.
 
-Fortunately, OpenAI publishes the Codex CLI source, so I could move from guessing to reading and experimenting. The source confirmed the important part of my hypothesis: remote control is not a terminal tunnel. A remote session passes through several stages involving management APIs, websockets, delivery envelopes, and app-server JSON-RPC messages.
+Fortunately, OpenAI publishes the Codex CLI source, so I could move from guessing to reading and experimenting. The source confirmed the important part of my hypothesis: remote control is not a "just a tunnel" for the terminal. A remote session passes through several stages involving management APIs, websockets, delivery envelopes, and app-server JSON-RPC messages.
+
+For those who wan't to follow along at home, leave the listener from the previous example running, install `websockets`, and run:
+
+```
+import asyncio
+import json
+
+import websockets
+
+
+async def main():
+    async with websockets.connect("ws://127.0.0.1:4500") as ws:
+        async def call(request_id, method, params):
+            await ws.send(json.dumps({
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "method": method,
+                "params": params,
+            }))
+            while True:
+                message = json.loads(await ws.recv())
+                if message.get("id") == request_id:
+                    if "error" in message:
+                        raise RuntimeError(message["error"])
+                    return message["result"]
+
+        await call(1, "initialize", {
+            "clientInfo": {
+                "name": "local-shell-demo",
+                "version": "0.1.0",
+            },
+            "capabilities": {"experimentalApi": True},
+        })
+        await ws.send(json.dumps({
+            "jsonrpc": "2.0",
+            "method": "initialized",
+        }))
+
+        thread = (await call(2, "thread/start", {}))["thread"]["id"]
+
+        await ws.send(json.dumps({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "thread/shellCommand",
+            "params": {
+                "threadId": thread,
+                "command": "id",
+            },
+        }))
+
+        while True:
+            message = json.loads(await ws.recv())
+            print(json.dumps(message, indent=2))
+            if message.get("id") == 3 and "error" in message:
+                raise RuntimeError(message["error"])
+            if message.get("method") == "turn/completed":
+                break
+
+
+asyncio.run(main())
+```
 
 ## Peeling Back Remote Control
 
-Before building anything, I needed to understand how a command crossed that stack. At a high level, a remote session unfolds in stages: the host and controller authenticate to ChatGPT, enroll in their separate roles, and receive the identities and short-lived tokens they need for remote control. The controller then discovers the enrolled environment, both sides establish outbound websocket connections to the Internet relay, and the controller opens a logical stream by sending an app-server JSON-RPC `initialize` message inside a remote-control envelope. Only after that can commands and results begin moving between them. Following that sequence made it much easier to see what each part of the system contributed.
+If I was going to somehow get Codex to remote control another instance of Codex over the Internet, I needed to understand how a command crossed that stack. At a high level, a remote session unfolds in stages: the host and controller authenticate to ChatGPT, enroll in their separate roles, and receive the identities and short-lived tokens they need for remote control. The controller then discovers the enrolled environment, both sides establish outbound websocket connections to the Internet relay, and the controller opens a logical stream by sending an app-server JSON-RPC `initialize` message inside a remote-control envelope. Only after that can commands and results begin moving between them. Following that sequence made it much easier to see what each part of the system contributed.
+
+![Codex Internet remote-control authentication, enrollment, pairing, websocket, stream, and remote-operation sequence](/assets/images/remote-control-sequence-v2.png)
 
 ### Authentication
 
