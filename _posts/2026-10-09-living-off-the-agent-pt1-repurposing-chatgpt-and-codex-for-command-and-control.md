@@ -272,6 +272,8 @@ Process and file operations make a much more capable controller possible. Once I
 
 `ratGPT` became a proof of concept for using Codex as a Remote Access Trojan. It can prepare controlled-host bundles, track enrolled hosts, issue commands, control processes, and perform file operations through capabilities Codex already exposes.
 
+![ratGPT payload preparation, pre-authorization, deployment, relay rendezvous, and controlled-host workflow](/assets/images/ratgpt-workflow-v2.png)
+
 The uncomfortable part is how ordinary it can look on the wire:
 
 ```text
