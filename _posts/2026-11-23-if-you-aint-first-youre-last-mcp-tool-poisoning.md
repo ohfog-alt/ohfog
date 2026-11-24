@@ -1,9 +1,9 @@
 ---
 title: "If You Ain't First, You're Last: MCP Tool Poisoning and the Race to Hijack Your AI Agent"
 date: 2026-11-23 17:35:00 -0500
-tags: [mcp, ai-agents, tool-poisoning, tool-shadowing, prompt-injection, security-research]
+tags: [mcp, agent, harness, tools, prompt-injection]
 excerpt: "How a paragraph of marketing copy in an MCP tool description hijacks agent execution, wins a tool race regardless of registry order, and exfiltrates local secrets through a benign file reader."
-toc: true
+toc: false
 ---
 This research and the accompanying [firsty / mcp-lure-lab](https://github.com/ohfog-alt/firsty) tools, test harnesses are proofs of concept, provided as-is for educational and defensive research, not production tooling. Use them only with accounts and systems you own or are explicitly authorized to test.
 
