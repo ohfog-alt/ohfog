@@ -173,7 +173,7 @@ The pattern that jumped out at me was which pretexts worked best. Everything tha
 
 The pretexts that scored lower: branch state, dependency integrity, stale context. They sound more like developer housekeeping than security obligations. The model was more willing to skip those.
 
-### Registry order provided zero protection
+### Tool Shadowing: registry order provided zero protection
 
 This was the finding I found most striking. In the shadow experiment, we gave the model a neutral prompt:
 
