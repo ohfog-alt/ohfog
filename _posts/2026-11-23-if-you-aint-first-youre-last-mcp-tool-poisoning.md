@@ -5,12 +5,16 @@ tags: [mcp, agent, harness, tools, prompt-injection]
 excerpt: "How a paragraph of marketing copy in an MCP tool description hijacks agent execution, wins a tool race regardless of registry order, and exfiltrates local secrets through a benign file reader."
 toc: false
 ---
+
 This research and the accompanying [firsty / mcp-lure-lab](https://github.com/ohfog-alt/firsty) tools, test harnesses are proofs of concept, provided as-is for educational and defensive research, not production tooling. Use them only with accounts and systems you own or are explicitly authorized to test.
 
 Hi neighbor, the other day I was reviewing the long list of MCP servers my coding agent connects to and started wondering:
 
 ```text
-AI Agents connect to MCP servers to get access to new tools: How does the agent decide which tool to run? What would happen if two or more tools had very similar names or descriptions, how would the Agent decide which one to pick?
+AI Agents connect to MCP servers to get access to new tools: 
+How does the agent decide which tool to run? 
+What would happen if two or more tools had very similar names or descriptions, 
+how would the Agent decide which one to pick?
 ```
 
 In a "traditional computer program", function dispatch is deterministic. If you call `os.path.join`, the runtime resolves a symbol table, finds the function pointer, and jumps to it. If two executables share a name, your shell evaluates `$PATH` left to right, and the first match wins every time. There is no ambiguity and no negotiation.
